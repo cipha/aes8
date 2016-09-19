@@ -54,17 +54,7 @@ void sub_shift(aes_state s)
 // merge operations - less code, fewer assignments
 uint8_t ffm2(uint8_t a)
 {
-    // the remainder of the rijndael polynomial
-    uint8_t k = 0b11011;
-
-    // indicates whether the 8th bit is set, in which case we overflow upon multiplication
-    int shift = (a >> 7) & 0x01;
-
-    // multiply by two
-    uint8_t res = a << 1;
-
-    // xor with remainder of polynomial as we eliminated the outshifted byte by adding the Rijndael polynomial
-    return res ^ (shift * k);
+    return (a << 1) ^ (((a >> 7) & 0x01) * 0b11011);
 }
 
 // merge assignments

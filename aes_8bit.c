@@ -117,23 +117,12 @@ void key_schedule(aes_state key, aes_state roundkeys[11])
     int i;
     for (i = 1; i < 11; i++) {
 
-        uint8_t tmp[4];
-        memcpy(tmp, roundkeys[i-1][3], 4);
-        uint8_t t = tmp[0];
+        uint8_t t = roundkeys[i-1][3][0];
 
-        // shift, sub and add iteration constant
-        tmp[0] = S[tmp[1]] ^ ri;
-        tmp[1] = S[tmp[2]];
-        tmp[2] = S[tmp[3]];
-        tmp[3] = S[t];
-
-        ri = ffm2(ri);
-
-        // set words
-        roundkeys[i][0][0] = roundkeys[i-1][0][0] ^ tmp[0];
-        roundkeys[i][0][1] = roundkeys[i-1][0][1] ^ tmp[1];
-        roundkeys[i][0][2] = roundkeys[i-1][0][2] ^ tmp[2];
-        roundkeys[i][0][3] = roundkeys[i-1][0][3] ^ tmp[3];
+        roundkeys[i][0][0] = roundkeys[i-1][0][0] ^ S[roundkeys[i-1][3][1]] ^ ri;
+        roundkeys[i][0][1] = roundkeys[i-1][0][1] ^ S[roundkeys[i-1][3][2]];
+        roundkeys[i][0][2] = roundkeys[i-1][0][2] ^ S[roundkeys[i-1][3][3]];
+        roundkeys[i][0][3] = roundkeys[i-1][0][3] ^ S[t];
 
         roundkeys[i][1][0] = roundkeys[i-1][1][0] ^ roundkeys[i][0][0];
         roundkeys[i][1][1] = roundkeys[i-1][1][1] ^ roundkeys[i][0][1];
@@ -149,6 +138,8 @@ void key_schedule(aes_state key, aes_state roundkeys[11])
         roundkeys[i][3][1] = roundkeys[i-1][3][1] ^ roundkeys[i][2][1];
         roundkeys[i][3][2] = roundkeys[i-1][3][2] ^ roundkeys[i][2][2];
         roundkeys[i][3][3] = roundkeys[i-1][3][3] ^ roundkeys[i][2][3];
+
+        ri = ffm2(ri);
     }
 }
 

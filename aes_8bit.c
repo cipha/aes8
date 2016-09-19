@@ -51,12 +51,12 @@ void sub_shift(aes_state s)
     s[1][3] = S[tmp];
 }
 
+// inline?
 uint8_t ffm2(uint8_t a)
 {
     return (a << 1) ^ (((a >> 7) & 0x01) * 0b11011);
 }
 
-// merge assignments
 void mix_columns(aes_state s)
 {
     uint8_t t, u;
@@ -175,7 +175,3 @@ void aes_encrypt(const uint8_t key[16], const uint8_t plain[16], uint8_t cipher[
 
     memcpy(cipher, s, 16);
 }
-
-void mix_columns_i(aes_state s) {}
-void aes_decrypt(const uint8_t key[16], const uint8_t cipher[16], uint8_t plain[16]) {}
-void generate_t_tables(void) {}

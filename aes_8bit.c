@@ -39,51 +39,36 @@ uint8_t SI[] = {
     0xA0, 0xE0, 0x3B, 0x4D, 0xAE, 0x2A, 0xF5, 0xB0, 0xC8, 0xEB, 0xBB, 0x3C, 0x83, 0x53, 0x99, 0x61,
     0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D };
 
-void sub_bytes(aes_state s)
-{
-    s[0][0] = S[s[0][0]];
-    s[0][1] = S[s[0][1]];
-    s[0][2] = S[s[0][2]];
-    s[0][3] = S[s[0][3]];
-    s[1][0] = S[s[1][0]];
-    s[1][1] = S[s[1][1]];
-    s[1][2] = S[s[1][2]];
-    s[1][3] = S[s[1][3]];
-    s[2][0] = S[s[2][0]];
-    s[2][1] = S[s[2][1]];
-    s[2][2] = S[s[2][2]];
-    s[2][3] = S[s[2][3]];
-    s[3][0] = S[s[3][0]];
-    s[3][1] = S[s[3][1]];
-    s[3][2] = S[s[3][2]];
-    s[3][3] = S[s[3][3]];
-}
-
-void shift_rows(aes_state s)
+void sub_shift(aes_state s)
 {
     uint8_t tmp;
-    // first row; do nothing
+    // first row; no shift
+    s[0][0] = S[s[0][0]];
+    s[1][0] = S[s[1][0]];
+    s[2][0] = S[s[2][0]];
+    s[3][0] = S[s[3][0]];
+
     // second row; shift 1 left
     tmp = s[0][1];
-    s[0][1] = s[1][1];
-    s[1][1] = s[2][1];
-    s[2][1] = s[3][1];
-    s[3][1] = tmp;
+    s[0][1] = S[s[1][1]];
+    s[1][1] = S[s[2][1]];
+    s[2][1] = S[s[3][1]];
+    s[3][1] = S[tmp];
 
     // third row; shift 2 left
     tmp = s[0][2];
-    s[0][2] = s[2][2];
-    s[2][2] = tmp;
+    s[0][2] = S[s[2][2]];
+    s[2][2] = S[tmp];
     tmp = s[1][2];
-    s[1][2] = s[3][2];
-    s[3][2] = tmp;
+    s[1][2] = S[s[3][2]];
+    s[3][2] = S[tmp];
 
     // fourth row; shift 3 left
     tmp = s[0][3];
-    s[0][3] = s[3][3];
-    s[3][3] = s[2][3];
-    s[2][3] = s[1][3];
-    s[1][3] = tmp;
+    s[0][3] = S[s[3][3]];
+    s[3][3] = S[s[2][3]];
+    s[2][3] = S[s[1][3]];
+    s[1][3] = S[tmp];
 }
 
 // merge operations - less code, fewer assignments
@@ -216,14 +201,12 @@ void aes_encrypt(const uint8_t key[16], const uint8_t plain[16], uint8_t cipher[
 
     int i;
     for (i=1; i<10; i++) {
-        sub_bytes(s);
-        shift_rows(s);
+        sub_shift(s);
         mix_columns(s);
         add_round_key(s, roundkeys[i]);
     }
 
-    sub_bytes(s);
-    shift_rows(s);
+    sub_shift(s);
     add_round_key(s, roundkeys[10]);
 
     memcpy(cipher, s, 16);

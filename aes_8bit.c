@@ -3,8 +3,7 @@
 
 // redefine aes_state to be a struct of array, so that it is assignable
 
-// stored in flash
-static uint8_t S[] = {
+static const uint8_t S[] = {
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
     0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
@@ -23,7 +22,7 @@ static uint8_t S[] = {
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
 };
 
-void ark_sub_shift_key(aes_state s, aes_state key, uint8_t ri)
+static void ark_sub_shift_key(aes_state s, aes_state key, uint8_t ri)
 {
     uint8_t tmp;
     // first row; no shift
@@ -70,7 +69,7 @@ void ark_sub_shift_key(aes_state s, aes_state key, uint8_t ri)
 // pointer arit instead of index?
 #define ffm2(a) (((a) << 1) ^ ((((a) >> 7) & 0x01) * 0b11011))
 
-void mix_columns(aes_state s)
+static void mix_columns(aes_state s)
 {
     uint8_t t, u;
     t = s[0][0] ^ s[0][1] ^ s[0][2] ^ s[0][3];
@@ -105,11 +104,11 @@ void mix_columns(aes_state s)
 void aes_encrypt(const uint8_t key[16], const uint8_t plain[16], uint8_t cipher[16])
 {
     aes_state s, k;
+    uint8_t i, ri = 0x01;
 
+    // should implement own memcpy or change signature of function, since it will pobably be less efficient on 8 bit anyway
     memcpy(k, key, 16);
     memcpy(s, plain, 16);
-
-    uint8_t i, ri = 0x01;
 
     // gcc knows how to unroll this
     for (i=0; i<9; i++) {

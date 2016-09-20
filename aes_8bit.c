@@ -3,6 +3,7 @@
 
 // redefine aes_state to be a struct of array, so that it is assignable
 
+// stored in flash
 static uint8_t S[] = {
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -22,7 +23,7 @@ static uint8_t S[] = {
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
 };
 
-void sub_shift_roundkey(aes_state s, aes_state key)
+void ark_sub_shift(aes_state s, aes_state key)
 {
     uint8_t tmp;
     // first row; no shift
@@ -89,75 +90,66 @@ void mix_columns(aes_state s)
     s[3][3] = s[3][3] ^ ffm2(s[3][3] ^ u) ^ t;
 }
 
-void key_schedule(aes_state key, aes_state roundkeys[11])
+// todo: figure out if it's faster to keep two keys and memcpy
+void next_round_key(aes_state key, uint8_t ri)
 {
-    memcpy(roundkeys[0], key, 16);
-    uint8_t ri = 0x01;
+        uint8_t t = key[3][0];
+        key[0][0] ^= S[key[3][1]] ^ ri;
+        key[0][1] ^= S[key[3][2]];
+        key[0][2] ^= S[key[3][3]];
+        key[0][3] ^= S[t];
 
-    int i;
-    // would this be faster/more compact as function called 11 times?
-    for (i = 1; i < 11; i++) {
+        key[1][0] ^= key[0][0];
+        key[1][1] ^= key[0][1];
+        key[1][2] ^= key[0][2];
+        key[1][3] ^= key[0][3];
 
-        uint8_t t = roundkeys[i-1][3][0];
+        key[2][0] ^= key[1][0];
+        key[2][1] ^= key[1][1];
+        key[2][2] ^= key[1][2];
+        key[2][3] ^= key[1][3];
 
-        roundkeys[i][0][0] = roundkeys[i-1][0][0] ^ S[roundkeys[i-1][3][1]] ^ ri;
-        roundkeys[i][0][1] = roundkeys[i-1][0][1] ^ S[roundkeys[i-1][3][2]];
-        roundkeys[i][0][2] = roundkeys[i-1][0][2] ^ S[roundkeys[i-1][3][3]];
-        roundkeys[i][0][3] = roundkeys[i-1][0][3] ^ S[t];
-
-        roundkeys[i][1][0] = roundkeys[i-1][1][0] ^ roundkeys[i][0][0];
-        roundkeys[i][1][1] = roundkeys[i-1][1][1] ^ roundkeys[i][0][1];
-        roundkeys[i][1][2] = roundkeys[i-1][1][2] ^ roundkeys[i][0][2];
-        roundkeys[i][1][3] = roundkeys[i-1][1][3] ^ roundkeys[i][0][3];
-
-        roundkeys[i][2][0] = roundkeys[i-1][2][0] ^ roundkeys[i][1][0];
-        roundkeys[i][2][1] = roundkeys[i-1][2][1] ^ roundkeys[i][1][1];
-        roundkeys[i][2][2] = roundkeys[i-1][2][2] ^ roundkeys[i][1][2];
-        roundkeys[i][2][3] = roundkeys[i-1][2][3] ^ roundkeys[i][1][3];
-
-        roundkeys[i][3][0] = roundkeys[i-1][3][0] ^ roundkeys[i][2][0];
-        roundkeys[i][3][1] = roundkeys[i-1][3][1] ^ roundkeys[i][2][1];
-        roundkeys[i][3][2] = roundkeys[i-1][3][2] ^ roundkeys[i][2][2];
-        roundkeys[i][3][3] = roundkeys[i-1][3][3] ^ roundkeys[i][2][3];
-
-        ri = ffm2(ri);
-    }
+        key[3][0] ^= key[2][0];
+        key[3][1] ^= key[2][1];
+        key[3][2] ^= key[2][2];
+        key[3][3] ^= key[2][3];
 }
 
 void aes_encrypt(const uint8_t key[16], const uint8_t plain[16], uint8_t cipher[16])
 {
-    aes_state s,k;
-    aes_state roundkeys[11];
+    aes_state s, k;
 
     memcpy(k, key, 16);
-    key_schedule(k, roundkeys);
-
     memcpy(s, plain, 16);
 
-    int i;
+    uint8_t i, ri = 0x01;
+
     // gcc knows how to unroll this
     for (i=0; i<9; i++) {
-        sub_shift_roundkey(s, roundkeys[i]);
+        ark_sub_shift(s, k);
+        next_round_key(k, ri);
+        ri = ffm2(ri);
         mix_columns(s);
     }
 
-    sub_shift_roundkey(s, roundkeys[9]);
-    s[0][0] ^= roundkeys[10][0][0];
-    s[0][1] ^= roundkeys[10][0][1];
-    s[0][2] ^= roundkeys[10][0][2];
-    s[0][3] ^= roundkeys[10][0][3];
-    s[1][0] ^= roundkeys[10][1][0];
-    s[1][1] ^= roundkeys[10][1][1];
-    s[1][2] ^= roundkeys[10][1][2];
-    s[1][3] ^= roundkeys[10][1][3];
-    s[2][0] ^= roundkeys[10][2][0];
-    s[2][1] ^= roundkeys[10][2][1];
-    s[2][2] ^= roundkeys[10][2][2];
-    s[2][3] ^= roundkeys[10][2][3];
-    s[3][0] ^= roundkeys[10][3][0];
-    s[3][1] ^= roundkeys[10][3][1];
-    s[3][2] ^= roundkeys[10][3][2];
-    s[3][3] ^= roundkeys[10][3][3];
+    ark_sub_shift(s, k);
+    next_round_key(k, ri);
+    s[0][0] ^= k[0][0];
+    s[0][1] ^= k[0][1];
+    s[0][2] ^= k[0][2];
+    s[0][3] ^= k[0][3];
+    s[1][0] ^= k[1][0];
+    s[1][1] ^= k[1][1];
+    s[1][2] ^= k[1][2];
+    s[1][3] ^= k[1][3];
+    s[2][0] ^= k[2][0];
+    s[2][1] ^= k[2][1];
+    s[2][2] ^= k[2][2];
+    s[2][3] ^= k[2][3];
+    s[3][0] ^= k[3][0];
+    s[3][1] ^= k[3][1];
+    s[3][2] ^= k[3][2];
+    s[3][3] ^= k[3][3];
 
     memcpy(cipher, s, 16);
 }

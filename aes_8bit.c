@@ -1,6 +1,8 @@
 #include "aes_8bit.h"
 #include <string.h>
 
+// redefine aes_state to be a struct of array, so that it is assignable
+
 static uint8_t S[] = {
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -17,41 +19,42 @@ static uint8_t S[] = {
     0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
     0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
     0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
-    0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16 };
+    0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
+};
 
-void sub_shift(aes_state s)
+void sub_shift_roundkey(aes_state s, aes_state key)
 {
     uint8_t tmp;
     // first row; no shift
-    s[0][0] = S[s[0][0]];
-    s[1][0] = S[s[1][0]];
-    s[2][0] = S[s[2][0]];
-    s[3][0] = S[s[3][0]];
+    s[0][0] = S[s[0][0] ^ key[0][0]];
+    s[1][0] = S[s[1][0] ^ key[1][0]];
+    s[2][0] = S[s[2][0] ^ key[2][0]];
+    s[3][0] = S[s[3][0] ^ key[3][0]];
 
     // second row; shift 1 left
     tmp = s[0][1];
-    s[0][1] = S[s[1][1]];
-    s[1][1] = S[s[2][1]];
-    s[2][1] = S[s[3][1]];
-    s[3][1] = S[tmp];
+    s[0][1] = S[s[1][1] ^ key[1][1]];
+    s[1][1] = S[s[2][1] ^ key[2][1]];
+    s[2][1] = S[s[3][1] ^ key[3][1]];
+    s[3][1] = S[tmp ^ key[0][1]];
 
     // third row; shift 2 left
     tmp = s[0][2];
-    s[0][2] = S[s[2][2]];
-    s[2][2] = S[tmp];
+    s[0][2] = S[s[2][2] ^ key[2][2]];
+    s[2][2] = S[tmp ^ key[0][2]];
     tmp = s[1][2];
-    s[1][2] = S[s[3][2]];
-    s[3][2] = S[tmp];
+    s[1][2] = S[s[3][2] ^ key[3][2]];
+    s[3][2] = S[tmp ^ key[1][2]];
 
     // fourth row; shift 3 left
     tmp = s[0][3];
-    s[0][3] = S[s[3][3]];
-    s[3][3] = S[s[2][3]];
-    s[2][3] = S[s[1][3]];
-    s[1][3] = S[tmp];
+    s[0][3] = S[s[3][3] ^ key[3][3]];
+    s[3][3] = S[s[2][3] ^ key[2][3]];
+    s[2][3] = S[s[1][3] ^ key[1][3]];
+    s[1][3] = S[tmp ^ key[0][3]];
 }
 
-// inline?
+// inline or define (seems faster and smaller source code)? pointer arit instead of index?
 uint8_t ffm2(uint8_t a)
 {
     return (a << 1) ^ (((a >> 7) & 0x01) * 0b11011);
@@ -89,32 +92,13 @@ void mix_columns(aes_state s)
     s[3][3] = s[3][3] ^ ffm2(s[3][3] ^ u) ^ t;
 }
 
-void add_round_key(aes_state s, aes_state key)
-{
-    s[0][0] ^= key[0][0];
-    s[0][1] ^= key[0][1];
-    s[0][2] ^= key[0][2];
-    s[0][3] ^= key[0][3];
-    s[1][0] ^= key[1][0];
-    s[1][1] ^= key[1][1];
-    s[1][2] ^= key[1][2];
-    s[1][3] ^= key[1][3];
-    s[2][0] ^= key[2][0];
-    s[2][1] ^= key[2][1];
-    s[2][2] ^= key[2][2];
-    s[2][3] ^= key[2][3];
-    s[3][0] ^= key[3][0];
-    s[3][1] ^= key[3][1];
-    s[3][2] ^= key[3][2];
-    s[3][3] ^= key[3][3];
-}
-
 void key_schedule(aes_state key, aes_state roundkeys[11])
 {
     memcpy(roundkeys[0], key, 16);
     uint8_t ri = 0x01;
 
     int i;
+    // would this be faster/more compact as function called 11 times?
     for (i = 1; i < 11; i++) {
 
         uint8_t t = roundkeys[i-1][3][0];
@@ -152,17 +136,31 @@ void aes_encrypt(const uint8_t key[16], const uint8_t plain[16], uint8_t cipher[
     key_schedule(k, roundkeys);
 
     memcpy(s, plain, 16);
-    add_round_key(s, roundkeys[0]);
 
     int i;
-    for (i=1; i<10; i++) {
-        sub_shift(s);
+    // gcc knows how to unroll this
+    for (i=0; i<9; i++) {
+        sub_shift_roundkey(s, roundkeys[i]);
         mix_columns(s);
-        add_round_key(s, roundkeys[i]);
     }
 
-    sub_shift(s);
-    add_round_key(s, roundkeys[10]);
+    sub_shift_roundkey(s, roundkeys[9]);
+    s[0][0] ^= roundkeys[10][0][0];
+    s[0][1] ^= roundkeys[10][0][1];
+    s[0][2] ^= roundkeys[10][0][2];
+    s[0][3] ^= roundkeys[10][0][3];
+    s[1][0] ^= roundkeys[10][1][0];
+    s[1][1] ^= roundkeys[10][1][1];
+    s[1][2] ^= roundkeys[10][1][2];
+    s[1][3] ^= roundkeys[10][1][3];
+    s[2][0] ^= roundkeys[10][2][0];
+    s[2][1] ^= roundkeys[10][2][1];
+    s[2][2] ^= roundkeys[10][2][2];
+    s[2][3] ^= roundkeys[10][2][3];
+    s[3][0] ^= roundkeys[10][3][0];
+    s[3][1] ^= roundkeys[10][3][1];
+    s[3][2] ^= roundkeys[10][3][2];
+    s[3][3] ^= roundkeys[10][3][3];
 
     memcpy(cipher, s, 16);
 }

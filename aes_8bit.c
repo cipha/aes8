@@ -113,7 +113,6 @@ void aes_encrypt(const uint8_t key[16], const uint8_t plain[16], uint8_t cipher[
     memcpy(k, key, 16);
     memcpy(s, plain, 16);
 
-    // gcc knows how to unroll this
     for (i=0; i<9; i++) {
         ark_sub_shift_key(s, k, ri);
         ri = ffm2(ri);

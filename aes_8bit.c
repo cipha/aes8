@@ -65,9 +65,12 @@ static void ark_sub_shift_key(aes_state s, aes_state key, uint8_t ri)
 }
 
 
-
 // pointer arit instead of index?
-#define ffm2(a) (((a) << 1) ^ ((((a) >> 7) & 0x01) * 0b11011))
+
+// this seems to perform worse despite no branching
+//#define ffm2(a) (((a) << 1) ^ ((((a) >> 7) & 0x01) * 0b11011))
+
+#define ffm2(a) ((a) & 0x80 ? ((a) << 1) ^ 0b11011 : ((a) << 1))
 
 static void mix_columns(aes_state s)
 {

@@ -54,11 +54,8 @@ void sub_shift_roundkey(aes_state s, aes_state key)
     s[1][3] = S[tmp ^ key[0][3]];
 }
 
-// inline or define (seems faster and smaller source code)? pointer arit instead of index?
-uint8_t ffm2(uint8_t a)
-{
-    return (a << 1) ^ (((a >> 7) & 0x01) * 0b11011);
-}
+// pointer arit instead of index?
+#define ffm2(a) (((a) << 1) ^ ((((a) >> 7) & 0x01) * 0b11011))
 
 void mix_columns(aes_state s)
 {

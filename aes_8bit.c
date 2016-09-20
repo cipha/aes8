@@ -23,7 +23,7 @@ static uint8_t S[] = {
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
 };
 
-void ark_sub_shift(aes_state s, aes_state key)
+void ark_sub_shift_key(aes_state s, aes_state key, uint8_t ri)
 {
     uint8_t tmp;
     // first row; no shift
@@ -53,7 +53,19 @@ void ark_sub_shift(aes_state s, aes_state key)
     s[3][3] = S[s[2][3] ^ key[2][3]];
     s[2][3] = S[s[1][3] ^ key[1][3]];
     s[1][3] = S[tmp ^ key[0][3]];
+
+    // todo: figure out if it's faster to keep two keys and memcpy
+    key[0][0] ^= S[key[3][1]] ^ ri;
+    key[0][1] ^= S[key[3][2]];
+    key[0][2] ^= S[key[3][3]];
+    key[0][3] ^= S[key[3][0]];
+
+    key[1][0] ^= key[0][0]; key[1][1] ^= key[0][1]; key[1][2] ^= key[0][2]; key[1][3] ^= key[0][3];
+    key[2][0] ^= key[1][0]; key[2][1] ^= key[1][1]; key[2][2] ^= key[1][2]; key[2][3] ^= key[1][3];
+    key[3][0] ^= key[2][0]; key[3][1] ^= key[2][1]; key[3][2] ^= key[2][2]; key[3][3] ^= key[2][3];
 }
+
+
 
 // pointer arit instead of index?
 #define ffm2(a) (((a) << 1) ^ ((((a) >> 7) & 0x01) * 0b11011))
@@ -90,31 +102,6 @@ void mix_columns(aes_state s)
     s[3][3] = s[3][3] ^ ffm2(s[3][3] ^ u) ^ t;
 }
 
-// todo: figure out if it's faster to keep two keys and memcpy
-void next_round_key(aes_state key, uint8_t ri)
-{
-        uint8_t t = key[3][0];
-        key[0][0] ^= S[key[3][1]] ^ ri;
-        key[0][1] ^= S[key[3][2]];
-        key[0][2] ^= S[key[3][3]];
-        key[0][3] ^= S[t];
-
-        key[1][0] ^= key[0][0];
-        key[1][1] ^= key[0][1];
-        key[1][2] ^= key[0][2];
-        key[1][3] ^= key[0][3];
-
-        key[2][0] ^= key[1][0];
-        key[2][1] ^= key[1][1];
-        key[2][2] ^= key[1][2];
-        key[2][3] ^= key[1][3];
-
-        key[3][0] ^= key[2][0];
-        key[3][1] ^= key[2][1];
-        key[3][2] ^= key[2][2];
-        key[3][3] ^= key[2][3];
-}
-
 void aes_encrypt(const uint8_t key[16], const uint8_t plain[16], uint8_t cipher[16])
 {
     aes_state s, k;
@@ -126,30 +113,16 @@ void aes_encrypt(const uint8_t key[16], const uint8_t plain[16], uint8_t cipher[
 
     // gcc knows how to unroll this
     for (i=0; i<9; i++) {
-        ark_sub_shift(s, k);
-        next_round_key(k, ri);
+        ark_sub_shift_key(s, k, ri);
         ri = ffm2(ri);
         mix_columns(s);
     }
 
-    ark_sub_shift(s, k);
-    next_round_key(k, ri);
-    s[0][0] ^= k[0][0];
-    s[0][1] ^= k[0][1];
-    s[0][2] ^= k[0][2];
-    s[0][3] ^= k[0][3];
-    s[1][0] ^= k[1][0];
-    s[1][1] ^= k[1][1];
-    s[1][2] ^= k[1][2];
-    s[1][3] ^= k[1][3];
-    s[2][0] ^= k[2][0];
-    s[2][1] ^= k[2][1];
-    s[2][2] ^= k[2][2];
-    s[2][3] ^= k[2][3];
-    s[3][0] ^= k[3][0];
-    s[3][1] ^= k[3][1];
-    s[3][2] ^= k[3][2];
-    s[3][3] ^= k[3][3];
+    ark_sub_shift_key(s, k, ri);
+    s[0][0] ^= k[0][0]; s[0][1] ^= k[0][1]; s[0][2] ^= k[0][2]; s[0][3] ^= k[0][3];
+    s[1][0] ^= k[1][0]; s[1][1] ^= k[1][1]; s[1][2] ^= k[1][2]; s[1][3] ^= k[1][3];
+    s[2][0] ^= k[2][0]; s[2][1] ^= k[2][1]; s[2][2] ^= k[2][2]; s[2][3] ^= k[2][3];
+    s[3][0] ^= k[3][0]; s[3][1] ^= k[3][1]; s[3][2] ^= k[3][2]; s[3][3] ^= k[3][3];
 
     memcpy(cipher, s, 16);
 }
